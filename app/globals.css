@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply antialiased text-slate-800;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+
+  p {
+    @apply leading-relaxed text-slate-700;
+  }
+
+  ::selection {
+    @apply bg-red-100 text-merah-formal;
+  }
+}
+
+@layer utilities {
+  /* Dot pattern — sangat tipis, transparan */
+  .bg-dot-pattern {
+    background-image: radial-gradient(circle, rgba(148, 163, 184, 0.25) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Grid line pattern — sangat tipis */
+  .bg-grid-pattern {
+    background-image:
+      linear-gradient(to right,  rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+}
+
+/* Custom Scrollbar for a more premium look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400;
+}
