@@ -56,8 +56,6 @@ Thumbs.db
 *.sln
 *.swp
 
-# 8. Sub-project Local Folders (If pushed as separate repos)
-panel/node_modules
-panel/.next
-telegram-bot/node_modules
-telegram-bot/.env
+# 8. Sub-project Local Folders (Pushed as separate repos)
+panel/
+telegram-bot/
