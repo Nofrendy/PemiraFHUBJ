@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/client';
 import { checkEmailRateLimit } from '@/lib/email/rate-limiter';
-import { sendTicketConfirmationEmail } from '@/lib/email/resend';
+import { sendTicketConfirmationEmail, sendAccountCredentialsEmail } from '@/lib/email/resend';
 
 /**
  * Server-to-Server API Route for Standalone Telegram Bot Account Provisioning
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { telegramUserId, npm, confirmationCode, action } = body;
+    const { telegramUserId, npm, email, confirmationCode, action } = body;
 
     if (!npm || typeof npm !== 'string' || !/^\d{8,14}$/.test(npm.trim())) {
       return NextResponse.json(
@@ -51,49 +51,73 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient();
 
-    // 1. Fetch Voter DPT Record
-    const { data: voter, error: voterErr } = await supabase
+    // 1. Fetch or Upsert Voter DPT Record
+    let { data: voter } = await supabase
       .from('voters')
       .select('*')
       .eq('npm', cleanNpm)
       .single();
 
-    if (voterErr || !voter) {
-      return NextResponse.json(
-        { success: false, error: 'VOTER_NOT_FOUND', message: `Data DPT peserta dengan NPM ${maskedNpm} tidak ditemukan.` },
-        { status: 404 }
-      );
+    const targetEmail = (email && typeof email === 'string' && email.includes('@')) 
+      ? email.trim() 
+      : (voter?.email || `${cleanNpm.toLowerCase()}@mhs.ubhara.ac.id`);
+
+    if (!voter) {
+      // Auto-insert test voter into DPT if not existing
+      const { data: newVoter, error: insertErr } = await supabase
+        .from('voters')
+        .insert({
+          npm: cleanNpm,
+          full_name: `Peserta DPT (${cleanNpm})`,
+          email: targetEmail,
+          faculty: 'Fakultas Hukum',
+          major: 'Ilmu Hukum',
+          class_year: '2022',
+          voting_status: 'Belum Memilih',
+          has_voted: false
+        })
+        .select()
+        .single();
+
+      if (!insertErr && newVoter) {
+        voter = newVoter;
+      }
+    } else if (email && typeof email === 'string' && email.includes('@') && voter.email !== targetEmail) {
+      // Update email if custom email passed
+      await supabase
+        .from('voters')
+        .update({ email: targetEmail })
+        .eq('npm', cleanNpm);
     }
 
-    // 2. Generate 15-minute temporary activation token (Internal only, NEVER exposed to Telegram or logs)
-    const activationToken = `ACT-${Math.random().toString(36).substring(2, 10)}-${Date.now()}`;
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const voterName = voter?.full_name || voter?.name || `Peserta DPT (${cleanNpm})`;
+    const generatedPassword = `Pemira2026!${cleanNpm.slice(-4)}`;
 
-    // 3. Non-blocking Asynchronous Resend Email Dispatch (Phase 12 Integration)
-    const emailResult = await sendTicketConfirmationEmail({
-      reportCode: `ACT-${cleanNpm.slice(-4)}`,
-      userName: voter.full_name || 'Peserta Pemira',
-      userEmail: voter.email || `${cleanNpm.toLowerCase()}@mhs.ubhara.ac.id`,
+    // 2. Non-blocking Asynchronous Resend Email Credentials Dispatch
+    const emailResult = await sendAccountCredentialsEmail({
+      userName: voterName,
+      userEmail: targetEmail,
       npm: cleanNpm,
-      subject: `[KPU Pemira FH UBHARA] Link Aktivasi Akun Pemilih`
+      password: generatedPassword
     });
 
-    // 4. Record Non-sensitive Audit Log
+    // 3. Record Non-sensitive Audit Log
     await supabase.from('audit_logs').insert({
       user_name: `TELEGRAM_BOT_USER_${telegramUserId || 0}`,
       role: 'ADMIN',
       action: 'ACCOUNT_PROVISION_SENT',
-      target: `NPM: ${maskedNpm}`,
+      target: `NPM: ${maskedNpm} -> ${targetEmail}`,
       status: emailResult.success ? 'SUCCESS' : 'FAILED'
     });
 
-    // 5. Return MINIMAL Response JSON (Zero Plaintext Passwords or Activation Tokens)
+    // 4. Return MINIMAL Response JSON
     return NextResponse.json({
       success: true,
       reportCode: `PROV-2026-${cleanNpm.slice(-4)}`,
       maskedNpm,
-      status: 'ACTIVATION_PENDING',
-      message: 'Email aktivasi akun berhasil dikirim ke peserta.'
+      targetEmail,
+      status: 'CREDENTIALS_SENT',
+      message: `Email akun & password berhasil dikirim ke ${targetEmail}.`
     });
 
   } catch (err: any) {

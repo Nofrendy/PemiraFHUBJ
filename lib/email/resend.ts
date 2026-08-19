@@ -19,6 +19,14 @@ export interface TicketReplyNotificationParams {
   adminResponse: string;
 }
 
+export interface AccountCredentialsParams {
+  userName: string;
+  userEmail: string;
+  npm: string;
+  password?: string;
+  activationToken?: string;
+}
+
 /**
  * Send Helpdesk Ticket Confirmation Email (Server-Side Only)
  */
@@ -170,6 +178,86 @@ export async function sendTicketReplyNotificationEmail(params: TicketReplyNotifi
     console.error(`[Resend Exception] Async reply dispatch error for ${params.reportCode}:`, err?.message || err);
     await logEmailAudit('EMAIL_DISPATCH_EXCEPTION', params.reportCode, 'FAILED');
     return { success: false, message: 'Terjadi exception pada pengiriman email balasan non-blocking.', eventKey };
+  }
+}
+
+/**
+ * Send Voter Account Credentials Email (NPM & Password)
+ */
+export async function sendAccountCredentialsEmail(params: AccountCredentialsParams): Promise<{ success: boolean; message: string; eventKey: string }> {
+  const eventKey = `${params.npm}:account_sent:${Date.now()}`;
+  const resendApiKey = process.env.RESEND_API_KEY;
+
+  try {
+    if (!resendApiKey || resendApiKey === 'placeholder-resend-key') {
+      console.log(`[Resend Simulation] Credentials Email sent for ${params.npm} to ${params.userEmail}`);
+      markEmailEventProcessed(eventKey);
+      return { success: true, message: 'Email akun berhasil dikirim (Simulation).', eventKey };
+    }
+
+    const recipient = params.userEmail;
+    const loginUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rendsmod.my.id/surat-suara';
+
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${resendApiKey}`,
+        'X-Entity-Ref-ID': eventKey
+      },
+      body: JSON.stringify({
+        from: 'KPU Pemira FH UBHARA <pemira@resend.dev>',
+        to: [recipient],
+        subject: `[KPU Pemira FH UBHARA] Akun & Kode Akses Login Pemilih (${params.npm})`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background-color: #ffffff;">
+            <h2 style="color: #8b0000; font-family: Georgia, serif; border-bottom: 2px solid #8b0000; padding-bottom: 12px;">Akun & Akses Login Pemira BEM FH UBHARA 2026</h2>
+            <p>Halo <strong>${params.userName}</strong>,</p>
+            <p>Panitia KPU Pemira BEM FH UBHARA 2026 telah menerbitkan akses login resmi untuk Anda sebagai pemilih terdaftar DPT.</p>
+            
+            <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 18px; margin: 20px 0;">
+              <p style="margin: 0 0 6px 0; font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: bold;">Nomor Pokok Mahasiswa (NPM)</p>
+              <p style="margin: 0 0 14px 0; font-size: 20px; font-family: monospace; font-weight: bold; color: #0f172a;">${params.npm}</p>
+              
+              <p style="margin: 0 0 6px 0; font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: bold;">Password Login</p>
+              <p style="margin: 0; font-size: 20px; font-family: monospace; font-weight: bold; color: #8b0000;">${params.password || 'Gunakan Password Default DPT'}</p>
+            </div>
+
+            <div style="text-align: center; margin: 28px 0;">
+              <a href="${loginUrl}" style="background-color: #8b0000; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px; display: inline-block;">
+                Masuk ke Bilik Suara / Surat Suara
+              </a>
+            </div>
+
+            <p style="font-size: 13px; color: #475569; leading-height: 1.5;">
+              <strong>Petunjuk Menggunakan Hak Pilih:</strong><br/>
+              1. Klik tombol di atas atau buka <code>${loginUrl}</code>.<br/>
+              2. Masukkan NPM <code>${params.npm}</code> dan Password Anda.<br/>
+              3. Pilih Paslon pilihan Anda secara aman dan anonim.
+            </p>
+
+            <p style="font-size: 12px; color: #94a3b8; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+              Pesan ini dikirimkan secara otomatis oleh KPU Pemira BEM FH UBHARA 2026. Harap menjaga kerahasiaan password Anda.
+            </p>
+          </div>
+        `
+      })
+    });
+
+    if (!res.ok) {
+      await logEmailAudit('EMAIL_CREDENTIALS_FAILED', params.npm, 'FAILED');
+      return { success: false, message: 'Gagal mengirim email kredensial via Resend API.', eventKey };
+    }
+
+    markEmailEventProcessed(eventKey);
+    await logEmailAudit('EMAIL_CREDENTIALS_SENT', params.npm, 'SUCCESS');
+
+    return { success: true, message: 'Email akun dan password berhasil dikirim.', eventKey };
+
+  } catch (err: any) {
+    console.error(`[Resend Exception] Async credentials dispatch error for ${params.npm}:`, err?.message || err);
+    await logEmailAudit('EMAIL_DISPATCH_EXCEPTION', params.npm, 'FAILED');
+    return { success: false, message: 'Terjadi exception pada pengiriman email kredensial.', eventKey };
   }
 }
 
