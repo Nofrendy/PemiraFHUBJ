@@ -9,20 +9,24 @@ import { sendTicketConfirmationEmail, sendAccountCredentialsEmail } from '@/lib/
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('Authorization');
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || request.headers.get('x-telegram-server-secret');
     const serverSecret = process.env.TELEGRAM_SERVER_SECRET || 'placeholder-telegram-server-secret';
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    let token = '';
+    if (authHeader) {
+      token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : authHeader.trim();
+    }
+
+    if (!token) {
       return NextResponse.json(
         { success: false, error: 'UNAUTHORIZED_SERVER_SECRET', message: 'Header Authorization Bearer server secret wajib diisi.' },
         { status: 401 }
       );
     }
 
-    const token = authHeader.substring(7).trim();
     if (token !== serverSecret) {
       return NextResponse.json(
-        { success: false, error: 'INVALID_SERVER_SECRET', message: 'Server secret tidak cocok.' },
+        { success: false, error: 'INVALID_SERVER_SECRET', message: `Server secret tidak cocok.` },
         { status: 401 }
       );
     }
