@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     const voterName = voter?.full_name || voter?.name || `Peserta DPT (${cleanNpm})`;
     const generatedPassword = `Pemira2026!${cleanNpm.slice(-4)}`;
 
-    // 2. Non-blocking Asynchronous Resend Email Credentials Dispatch
+    // 2. Resend Email Credentials Dispatch
     const emailResult = await sendAccountCredentialsEmail({
       userName: voterName,
       userEmail: targetEmail,
@@ -105,13 +105,21 @@ export async function POST(request: NextRequest) {
       password: generatedPassword
     });
 
+    if (!emailResult.success) {
+      return NextResponse.json({
+        success: false,
+        error: 'RESEND_EMAIL_FAILED',
+        message: `Gagal mengirim email: ${emailResult.message}`
+      }, { status: 400 });
+    }
+
     // 3. Record Non-sensitive Audit Log
     await supabase.from('audit_logs').insert({
       user_name: `TELEGRAM_BOT_USER_${telegramUserId || 0}`,
       role: 'ADMIN',
       action: 'ACCOUNT_PROVISION_SENT',
       target: `NPM: ${maskedNpm} -> ${targetEmail}`,
-      status: emailResult.success ? 'SUCCESS' : 'FAILED'
+      status: 'SUCCESS'
     });
 
     // 4. Return MINIMAL Response JSON

@@ -198,6 +198,8 @@ export async function sendAccountCredentialsEmail(params: AccountCredentialsPara
     const recipient = params.userEmail;
     const loginUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rendsmod.my.id/surat-suara';
 
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'KPU Pemira FH UBHARA <onboarding@resend.dev>';
+
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -206,7 +208,7 @@ export async function sendAccountCredentialsEmail(params: AccountCredentialsPara
         'X-Entity-Ref-ID': eventKey
       },
       body: JSON.stringify({
-        from: 'KPU Pemira FH UBHARA <pemira@resend.dev>',
+        from: fromEmail,
         to: [recipient],
         subject: `[KPU Pemira FH UBHARA] Akun & Kode Akses Login Pemilih (${params.npm})`,
         html: `
@@ -245,8 +247,10 @@ export async function sendAccountCredentialsEmail(params: AccountCredentialsPara
     });
 
     if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[Resend Error] API returned status ${res.status}: ${errText}`);
       await logEmailAudit('EMAIL_CREDENTIALS_FAILED', params.npm, 'FAILED');
-      return { success: false, message: 'Gagal mengirim email kredensial via Resend API.', eventKey };
+      return { success: false, message: `Resend API Error ${res.status}: ${errText}`, eventKey };
     }
 
     markEmailEventProcessed(eventKey);
