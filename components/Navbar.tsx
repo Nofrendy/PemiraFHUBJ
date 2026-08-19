@@ -2,13 +2,47 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Menu, X, Home, Users, BarChart2, BookOpen, HelpCircle, LogIn, ChevronRight } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Menu, X, Home, Users, BarChart2, BookOpen, HelpCircle, LogIn, LogOut, Vote, UserCheck, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createClient } from '@/lib/supabase/client';
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [npmBadge, setNpmBadge] = useState<string>('');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  // Load and listen to Supabase Auth state
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user || null);
+      if (data.user) {
+        const email = data.user.email || '';
+        const npm = data.user.user_metadata?.npm || email.split('@')[0];
+        setNpmBadge(npm);
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+      if (currentUser) {
+        const email = currentUser.email || '';
+        const npm = currentUser.user_metadata?.npm || email.split('@')[0];
+        setNpmBadge(npm);
+      } else {
+        setNpmBadge('');
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   // Tutup menu saat navigasi berubah
   useEffect(() => {
@@ -25,6 +59,22 @@ export default function Navbar() {
     return () => { document.body.style.overflow = ''; };
   }, [isMobileMenuOpen]);
 
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      setUser(null);
+      setNpmBadge('');
+      router.push('/login');
+      router.refresh();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   const navLinks = [
     { name: 'Beranda',    path: '/',          icon: Home },
     { name: 'Kandidat',   path: '/kandidat',   icon: Users },
@@ -32,6 +82,10 @@ export default function Navbar() {
     { name: 'Panduan',    path: '/panduan',    icon: BookOpen },
     { name: 'Bantuan',    path: '/bantuan',    icon: HelpCircle },
   ];
+
+  if (user) {
+    navLinks.push({ name: 'Bilik Suara', path: '/surat-suara', icon: Vote });
+  }
 
   return (
     <>
@@ -71,13 +125,32 @@ export default function Navbar() {
                   {link.name}
                 </Link>
               ))}
-              <Link
-                href="/login"
-                className="ml-2 inline-flex items-center gap-1.5 bg-merah-formal text-white hover:bg-red-900 px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 shadow-[0_2px_10px_-3px_rgba(139,0,0,0.4)] hover:shadow-[0_4px_15px_-3px_rgba(139,0,0,0.6)] hover:-translate-y-px"
-              >
-                <LogIn size={15} />
-                Login
-              </Link>
+
+              {user ? (
+                <div className="flex items-center gap-2 ml-2">
+                  <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
+                    <UserCheck size={14} className="text-emerald-600" />
+                    <span>NPM: {npmBadge}</span>
+                  </div>
+
+                  <button
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-red-600 hover:text-white px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 border border-slate-200 hover:border-red-600"
+                  >
+                    <LogOut size={15} />
+                    {isLoggingOut ? 'Keluar...' : 'Keluar'}
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href="/login"
+                  className="ml-2 inline-flex items-center gap-1.5 bg-merah-formal text-white hover:bg-red-900 px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 shadow-[0_2px_10px_-3px_rgba(139,0,0,0.4)] hover:shadow-[0_4px_15px_-3px_rgba(139,0,0,0.6)] hover:-translate-y-px"
+                >
+                  <LogIn size={15} />
+                  Login Pemilih
+                </Link>
+              )}
             </div>
 
             {/* Hamburger Button (mobile only) */}
@@ -120,8 +193,12 @@ export default function Navbar() {
               {/* Panel Header */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
                 <div>
-                  <p className="font-serif font-bold text-lg text-slate-900 leading-none">Menu</p>
-                  <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-widest">Navigasi</p>
+                  <p className="font-serif font-bold text-lg text-slate-900 leading-none">Menu Navigasi</p>
+                  {user && (
+                    <p className="text-xs text-emerald-600 font-semibold mt-1">
+                      NPM: {npmBadge}
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
@@ -166,21 +243,34 @@ export default function Navbar() {
                 })}
               </nav>
 
-              {/* Login Button di bawah panel */}
+              {/* Login / Logout Button di bawah panel */}
               <div className="px-4 pb-8 pt-4 border-t border-slate-100">
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.25 }}
                 >
-                  <Link
-                    href="/login"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center justify-center gap-2 w-full bg-merah-formal text-white hover:bg-red-900 px-4 py-4 rounded-2xl text-base font-bold transition-all duration-300 shadow-[0_4px_15px_-3px_rgba(139,0,0,0.4)]"
-                  >
-                    <LogIn size={18} />
-                    Login ke Portal
-                  </Link>
+                  {user ? (
+                    <button
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex items-center justify-center gap-2 w-full bg-slate-800 text-white hover:bg-red-700 px-4 py-4 rounded-2xl text-base font-bold transition-all duration-300"
+                    >
+                      <LogOut size={18} />
+                      Keluar dari Akun
+                    </button>
+                  ) : (
+                    <Link
+                      href="/login"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center justify-center gap-2 w-full bg-merah-formal text-white hover:bg-red-900 px-4 py-4 rounded-2xl text-base font-bold transition-all duration-300 shadow-[0_4px_15px_-3px_rgba(139,0,0,0.4)]"
+                    >
+                      <LogIn size={18} />
+                      Login Pemilih
+                    </Link>
+                  )}
                 </motion.div>
               </div>
             </motion.div>
