@@ -97,7 +97,62 @@ export async function POST(request: NextRequest) {
     const voterName = voter?.full_name || voter?.name || `Peserta DPT (${cleanNpm})`;
     const generatedPassword = `Pemira2026!${cleanNpm.slice(-4)}`;
 
-    // 2. Resend Email Credentials Dispatch
+    // 2. Ensure Supabase Auth user is created/updated for login authentication
+    const authEmail = `${cleanNpm}@mhs.ubhara.ac.id`;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cxxhmpmipkiwatemcfkc.supabase.co';
+
+    try {
+      if (serviceRoleKey && serviceRoleKey !== 'placeholder-service-key') {
+        const { createClient: createAdminClient } = await import('@supabase/supabase-js');
+        const adminClient = createAdminClient(supabaseUrl, serviceRoleKey);
+        
+        const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+        const existingUser = existingUsers?.users?.find(u => u.email === authEmail || u.user_metadata?.npm === cleanNpm);
+
+        let createdAuthUserId = existingUser?.id;
+
+        if (!existingUser) {
+          const { data: newUser } = await adminClient.auth.admin.createUser({
+            email: authEmail,
+            password: generatedPassword,
+            email_confirm: true,
+            user_metadata: { npm: cleanNpm, full_name: voterName }
+          });
+          createdAuthUserId = newUser?.user?.id;
+        } else {
+          await adminClient.auth.admin.updateUserById(existingUser.id, {
+            password: generatedPassword,
+            email_confirm: true
+          });
+        }
+
+        if (createdAuthUserId) {
+          await supabase
+            .from('voters')
+            .update({ user_id: createdAuthUserId, account_status: 'Active' })
+            .eq('npm', cleanNpm);
+        }
+      } else {
+        const { data: signUpData } = await supabase.auth.signUp({
+          email: authEmail,
+          password: generatedPassword,
+          options: {
+            data: { npm: cleanNpm, full_name: voterName }
+          }
+        });
+        if (signUpData?.user) {
+          await supabase
+            .from('voters')
+            .update({ user_id: signUpData.user.id, account_status: 'Active' })
+            .eq('npm', cleanNpm);
+        }
+      }
+    } catch (authErr) {
+      console.warn('[Provision Auth Sync Warning] Could not sync Supabase Auth user:', authErr);
+    }
+
+    // 3. Resend Email Credentials Dispatch
     const emailResult = await sendAccountCredentialsEmail({
       userName: voterName,
       userEmail: targetEmail,

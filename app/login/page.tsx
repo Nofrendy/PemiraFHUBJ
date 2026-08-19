@@ -2,13 +2,16 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent } from "@/components/ui/Card";
+import { loginVoter } from "@/lib/auth";
 
 export default function LoginPemilihPage() {
+  const router = useRouter();
   const [npm, setNpm] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -20,25 +23,39 @@ export default function LoginPemilihPage() {
     const value = e.target.value.replace(/\D/g, '');
     setNpm(value);
 
-    if (value.length > 0 && value.length !== 12) {
-      setNpmError('NPM harus terdiri dari 12 digit angka.');
+    if (value.length > 0 && (value.length < 8 || value.length > 14)) {
+      setNpmError('NPM harus terdiri dari 8-14 digit angka.');
     } else {
       setNpmError('');
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (npm.length !== 12) {
-      setNpmError('NPM harus terdiri dari 12 digit angka.');
+    if (!npm || npm.length < 8 || npm.length > 14) {
+      setNpmError('NPM harus terdiri dari 8-14 digit angka.');
       return;
     }
+    if (!password) {
+      setNpmError('Password wajib diisi.');
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    setNpmError('');
+
+    try {
+      await loginVoter(npm, password);
       setShowSuccessToast(true);
-      setTimeout(() => setShowSuccessToast(false), 4000);
-    }, 1200);
+      setTimeout(() => {
+        router.push('/surat-suara');
+      }, 1500);
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setNpmError(err.message || 'Gagal login. Periksa NPM dan Password Anda.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -170,7 +187,7 @@ export default function LoginPemilihPage() {
                     variant="primary"
                     type="submit"
                     className="w-full py-3.5 text-base"
-                    disabled={isLoading || npm.length !== 12}
+                    disabled={isLoading || npm.length < 8 || npm.length > 14}
                   >
                     {isLoading ? (
                       <span className="flex items-center justify-center gap-2">
