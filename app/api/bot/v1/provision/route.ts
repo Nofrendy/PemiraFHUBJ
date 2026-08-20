@@ -9,12 +9,13 @@ import { sendTicketConfirmationEmail, sendAccountCredentialsEmail } from '@/lib/
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || request.headers.get('x-telegram-server-secret');
+    const rawSecretHeader = request.headers.get('x-telegram-server-secret') || '';
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || '';
     const configuredSecret = (process.env.TELEGRAM_SERVER_SECRET || '').trim();
     const defaultSecret = 'S2S_PEMIRA_BOT_KEY_2026';
 
-    let token = '';
-    if (authHeader) {
+    let token = rawSecretHeader.trim();
+    if (!token && authHeader) {
       token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : authHeader.trim();
     }
 
@@ -204,12 +205,13 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || request.headers.get('x-telegram-server-secret');
+    const rawSecretHeader = request.headers.get('x-telegram-server-secret') || '';
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || '';
     const configuredSecret = (process.env.TELEGRAM_SERVER_SECRET || '').trim();
     const defaultSecret = 'S2S_PEMIRA_BOT_KEY_2026';
 
-    let token = '';
-    if (authHeader) {
+    let token = rawSecretHeader.trim();
+    if (!token && authHeader) {
       token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : authHeader.trim();
     }
 
