@@ -45,7 +45,7 @@ export async function getCandidateByNumber(number: string): Promise<CandidateRec
     .from('candidates')
     .select('*')
     .eq('number', number)
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
     return null;

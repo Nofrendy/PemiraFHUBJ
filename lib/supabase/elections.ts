@@ -20,8 +20,7 @@ export async function getElectionStatus(): Promise<ElectionRecord | null> {
   const { data, error } = await supabase
     .from('elections')
     .select('*')
-    .limit(1)
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
     console.error('Error fetching election status:', error);

@@ -25,7 +25,7 @@ export async function getVoterByNpm(npm: string): Promise<VoterRecord | null> {
     .from('voters')
     .select('*')
     .eq('npm', npm)
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
     return null;
@@ -47,7 +47,7 @@ export async function getCurrentUserVoterRecord(): Promise<VoterRecord | null> {
     .from('voters')
     .select('*')
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
   if (!error && data) {
     return data as VoterRecord;
