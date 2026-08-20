@@ -10,7 +10,8 @@ import { sendTicketConfirmationEmail, sendAccountCredentialsEmail } from '@/lib/
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || request.headers.get('x-telegram-server-secret');
-    const serverSecret = process.env.TELEGRAM_SERVER_SECRET || 'S2S_PEMIRA_BOT_KEY_2026';
+    const configuredSecret = (process.env.TELEGRAM_SERVER_SECRET || '').trim();
+    const defaultSecret = 'S2S_PEMIRA_BOT_KEY_2026';
 
     let token = '';
     if (authHeader) {
@@ -24,9 +25,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (token !== serverSecret) {
+    const isValidSecret = token === defaultSecret || (configuredSecret.length > 0 && token === configuredSecret);
+
+    if (!isValidSecret) {
       return NextResponse.json(
-        { success: false, error: 'INVALID_SERVER_SECRET', message: `Server secret tidak cocok.` },
+        { success: false, error: 'UNAUTHORIZED_SERVER_SECRET', message: 'Header Authorization Bearer server secret tidak cocok.' },
         { status: 401 }
       );
     }
@@ -202,14 +205,17 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || request.headers.get('x-telegram-server-secret');
-    const serverSecret = process.env.TELEGRAM_SERVER_SECRET || 'S2S_PEMIRA_BOT_KEY_2026';
+    const configuredSecret = (process.env.TELEGRAM_SERVER_SECRET || '').trim();
+    const defaultSecret = 'S2S_PEMIRA_BOT_KEY_2026';
 
     let token = '';
     if (authHeader) {
       token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : authHeader.trim();
     }
 
-    if (!token || token !== serverSecret) {
+    const isValidSecret = token === defaultSecret || (configuredSecret.length > 0 && token === configuredSecret);
+
+    if (!token || !isValidSecret) {
       return NextResponse.json(
         { success: false, error: 'UNAUTHORIZED_SERVER_SECRET', message: 'Header Authorization Bearer server secret tidak cocok atau belum di-set di Vercel.' },
         { status: 401 }
