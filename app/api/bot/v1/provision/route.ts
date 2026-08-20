@@ -201,12 +201,17 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('Authorization');
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || request.headers.get('x-telegram-server-secret');
     const serverSecret = process.env.TELEGRAM_SERVER_SECRET || 'placeholder-telegram-server-secret';
 
-    if (!authHeader || authHeader.substring(7).trim() !== serverSecret) {
+    let token = '';
+    if (authHeader) {
+      token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : authHeader.trim();
+    }
+
+    if (!token || token !== serverSecret) {
       return NextResponse.json(
-        { success: false, error: 'UNAUTHORIZED_SERVER_SECRET' },
+        { success: false, error: 'UNAUTHORIZED_SERVER_SECRET', message: 'Header Authorization Bearer server secret tidak cocok atau belum di-set di Vercel.' },
         { status: 401 }
       );
     }
