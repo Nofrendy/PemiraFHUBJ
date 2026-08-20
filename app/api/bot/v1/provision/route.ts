@@ -10,7 +10,7 @@ import { sendTicketConfirmationEmail, sendAccountCredentialsEmail } from '@/lib/
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || request.headers.get('x-telegram-server-secret');
-    const serverSecret = process.env.TELEGRAM_SERVER_SECRET || 'placeholder-telegram-server-secret';
+    const serverSecret = process.env.TELEGRAM_SERVER_SECRET || 'S2S_PEMIRA_BOT_KEY_2026';
 
     let token = '';
     if (authHeader) {
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || request.headers.get('x-telegram-server-secret');
-    const serverSecret = process.env.TELEGRAM_SERVER_SECRET || 'placeholder-telegram-server-secret';
+    const serverSecret = process.env.TELEGRAM_SERVER_SECRET || 'S2S_PEMIRA_BOT_KEY_2026';
 
     let token = '';
     if (authHeader) {
